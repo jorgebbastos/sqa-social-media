@@ -54,7 +54,7 @@ test('API 2: deve bloquear cadastro com e-mail duplicado', async ({ request }) =
 
   const body = await response.json();
 
-  expect(body.message).toBe('E-mail já está em uso');
+  expect(body.message).toBe('E-mail já cadastrado');
   expect(body.status).toBe(409);
 });
 
