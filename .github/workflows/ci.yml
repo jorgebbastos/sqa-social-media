@@ -1,0 +1,112 @@
+name: CI - Testes
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: admin
+          MYSQL_DATABASE: social_media
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -padmin"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Testes da API
+        working-directory: api
+        run: |
+          chmod +x mvnw
+          ./mvnw test
+
+      - name: Instalar dependências do client
+        working-directory: client
+        run: npm ci
+
+      - name: Testes do client
+        working-directory: client
+        run: npm test -- --runInBand
+
+      - name: Instalar dependências dos testes E2E/API
+        working-directory: tests
+        run: npm ci
+
+      - name: Instalar navegador do Playwright
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Iniciar API
+        working-directory: api
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/social_media
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: admin
+        run: |
+          nohup ./mvnw spring-boot:run > ../api.log 2>&1 &
+
+      - name: Aguardar API
+        run: |
+          for i in {1..60}; do
+            if curl -s http://localhost:8080/posts?limit=1 > /dev/null; then
+              echo "API iniciou"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "API não iniciou"
+          cat api.log
+          exit 1
+
+      - name: Iniciar client
+        working-directory: client
+        env:
+          NEXT_PUBLIC_BASE_URL: http://localhost:8080
+        run: |
+          nohup npm run dev > ../client.log 2>&1 &
+
+      - name: Aguardar client
+        run: |
+          for i in {1..60}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              echo "Client iniciou"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Client não iniciou"
+          cat client.log
+          exit 1
+
+      - name: Rodar testes E2E e API com Playwright
+        working-directory: tests
+        env:
+          API_URL: http://localhost:8080
+          CLIENT_URL: http://localhost:3000
+        run: npm test
