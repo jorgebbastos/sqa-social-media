@@ -80,12 +80,25 @@ export default function PostCard({
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           alignItems: "center",
           marginTop: "1rem",
         }}
       >
-        <button
+        <div
+          style={{
+            display: "flex",
+            gap: "1rem",
+            color: "var(--foreground)",
+            opacity: 0.8,
+            fontSize: "0.9rem",
+          }}
+        >
+          <span>Likes: {post.reactions?.likes ?? 0}</span>
+          <span>Dislikes: {post.reactions?.dislikes ?? 0}</span>
+        </div>
+
+          <button
           onClick={handleLike}
           disabled={isLoading}
           style={{
